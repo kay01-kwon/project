@@ -1,0 +1,17 @@
+<launch>
+    <node pkg="coax_control" type="coax_control" name="coax_control" output="screen"/>
+        
+        <param name="mass" type="double" value="40"/>
+
+        <param name="CM_x_T" type="double" value="0.00"/>
+        <param name="CM_y_T" type="double" value="0.00"/>
+        <param name="CM_z_T" type="double" value="0.6"/>
+        
+        <param name="Kp_pos" type="double" value="100"/>
+        <param name="Kd_pos" type="double" value="70"/>
+
+        <param name="Kp_ori" type="double" value="10"/>
+        <param name="Kd_ori" type="double" value="1"/>
+        
+        <param name="C_lift" type="double" value="0.000015"/>
+</launch>

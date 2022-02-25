@@ -1,0 +1,13 @@
+<launch>
+<node pkg="tvc_control" type="example" name="test" output="screen"/>
+
+  <param name="x_lower" type="double" value="-0.10"/>
+  <param name="width_lower" type="double" value="0.316"/>
+  <param name="z_lower" type="double" value="-0.312"/>
+
+  <param name="x_upper" type="double" value="-0.15"/>
+  <param name="width_upper" type="double" value="0.316"/>
+  <param name="z_upper" type="double" value="0.060"/>
+  <param name="theta_max" type="double" value="5"/>
+  
+</launch>

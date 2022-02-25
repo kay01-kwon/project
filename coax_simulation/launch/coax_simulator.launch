@@ -1,0 +1,16 @@
+<launch>
+    <node pkg="coax_simulation" type="simulation_main" name="coax_sim" output="screen"/>
+
+    <param name="mass" type="double" value="40"/>
+    <param name="CM_x_CM_T" type="double" value="0."/>
+    <param name="CM_y_CM_T" type="double" value="0."/>
+    <param name="CM_z_CM_T" type="double" value="-0.6"/>
+    <param name="Ixx" type="double" value="1"/>
+    <param name="Ixy" type="double" value="0"/>
+    <param name="Ixz" type="double" value="0"/>
+    <param name="Iyy" type="double" value="1"/>
+    <param name="Iyz" type="double" value="0"/>
+    <param name="Izz" type="double" value="1"/>
+    <param name="Lift_Coefficient" type="double" value="0.00001"/>
+
+</launch>
