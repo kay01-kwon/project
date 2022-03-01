@@ -62,11 +62,11 @@ CoaxCTRL::CoaxCTRL()
     traj_subscriber = nh.subscribe("/des_traj",1,&CoaxCTRL::CallbackDesTraj,this);
 
     cout<<"Estimated Pose Subscriber Setup"<<endl;
-    pose_subscriber = nh.subscribe("/mavros/global/local",1,&CoaxCTRL::CallbackPose,this);
+    pose_subscriber = nh.subscribe("/mavros/local_position/odom",1,&CoaxCTRL::CallbackPose,this);
 
     cout<<"*****Publisher Setup*****"<<endl;
     cout<<"Actuator Publisher Setup"<<endl;
-    actuator_publisher = nh.advertise<actuator>("/actuator",1);
+    actuator_publisher = nh.advertise<actuator>("/des_roll_pitch",1);
 
 
     I_p_CM.setZero();
@@ -85,6 +85,8 @@ CoaxCTRL::CoaxCTRL()
 
     roll_pitch_yaw.setZero();
     rpy_error.setZero();
+    
+    des_roll_pitch_yaw.setZero();
 
 }
 
@@ -132,7 +134,7 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
             pose_msg.twist.twist.angular.z;
 
 
-    PosControl();
+    //PosControl();
     OriControl();
 
 }
@@ -153,10 +155,9 @@ void CoaxCTRL::PosControl()
 
     des_yaw = -2*atan2(qz_des,qw_des);
 
-    roll_pitch_yaw(0) = asin(2*(qy*qz + qw*qx));
+    roll_pitch_yaw(0) = atan2(2*(qw*qx + qy*qz),1-2*(pow(qx,2)+pow(qy,2)));
     
-    roll_pitch_yaw(1) = -atan2(2*(qx*qz - qw*qy)/cos(roll_pitch_yaw(0)),
-    (1-2*(pow(qx,2)+pow(qy,2)))/cos(roll_pitch_yaw(0)));
+    roll_pitch_yaw(1) = asin(2*(qw*qy-qz*qx));
     
     roll_pitch_yaw(2) = atan2(2*(qx*qy - qw*qz)/cos(roll_pitch_yaw(0)),
     (1-2*(pow(qx,2)+pow(qz,2)))/cos(roll_pitch_yaw(0)));
@@ -180,15 +181,31 @@ void CoaxCTRL::OriControl()
 
     yaw_clamping();
 
+    //roll_pitch_yaw(0) = atan2(2*(qw*qx + qy*qz),1-2*(qx*qx+qy*qy));
+  
+    //roll_pitch_yaw(1) = asin(2*(qw*qy-qz*qx));
+
+    roll_pitch_yaw(0) = asin(2*(qy*qz + qw*qx));
+    
+    roll_pitch_yaw(1) = -atan2(2*(qx*qz - qw*qy)/cos(roll_pitch_yaw(0)),
+    (1-2*(pow(qx,2)+pow(qy,2)))/cos(roll_pitch_yaw(0)));
+
+    roll_pitch_yaw(2) = atan2(2*(qx*qy - qw*qz)/cos(roll_pitch_yaw(0)),
+    (1-2*(pow(qx,2)+pow(qz,2)))/cos(roll_pitch_yaw(0)));
+
+
     u_att = Kp_ori * (des_roll_pitch_yaw - roll_pitch_yaw) - Kd_ori*I_w;
     u_att(0) += eq_rp(0);
     u_att(1) += eq_rp(1);
 
+    cout<<roll_pitch_yaw*180.0/M_PI<<endl;
+    cout<<endl;
+
     actuator_data.main_rotor_pwm = throttle;
-    actuator_data.phi_u = u_att(0);
-    actuator_data.theta_u = u_att(1);
+    actuator_data.phi_u = - u_att(0);
+    actuator_data.theta_u = - u_att(1);
     actuator_data.right_servo = u_att(2)/2.0;
-    actuator_data.left_servo = -u_att(2)/2.0;
+    actuator_data.left_servo = u_att(2)/2.0;
 
     actuator_publisher.publish(actuator_data);
 }

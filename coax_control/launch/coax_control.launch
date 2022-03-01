@@ -10,8 +10,8 @@
         <param name="Kp_pos" type="double" value="100"/>
         <param name="Kd_pos" type="double" value="70"/>
 
-        <param name="Kp_ori" type="double" value="10"/>
-        <param name="Kd_ori" type="double" value="1"/>
+        <param name="Kp_ori" type="double" value="1"/>
+        <param name="Kd_ori" type="double" value="0.3"/>
         
         <param name="C_lift" type="double" value="0.000015"/>
 </launch>
