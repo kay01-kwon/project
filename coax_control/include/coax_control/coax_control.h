@@ -7,6 +7,7 @@
 #include <tip_generation/traj.h>
 
 #include <nav_msgs/Odometry.h>
+#include <std_msgs/Float64.h>
 #include <actuator_msgs/actuator.h>
 
 #include <eigen3/Eigen/Core>
@@ -14,6 +15,7 @@
 #include <cmath>
 
 using tip_generation::traj;
+using std_msgs::Float64;
 using nav_msgs::Odometry;
 using actuator_msgs::actuator;
 
@@ -34,6 +36,8 @@ class CoaxCTRL{
     // Callback trajectory
     void CallbackDesTraj(const traj & des_traj_data);
 
+    // Callback Heading
+    void CallbackHdg(const Float64 & cmps_hdg_data);
     // Callback Estimated Pose
     void CallbackPose(const Odometry & pose_msg);
 
@@ -57,6 +61,7 @@ class CoaxCTRL{
     private:
     ros::NodeHandle nh;
     ros::Subscriber traj_subscriber;
+    ros::Subscriber mag_subscriber;
     ros::Subscriber pose_subscriber;
     ros::Publisher actuator_publisher;
 
@@ -72,6 +77,14 @@ class CoaxCTRL{
     double &qy = I_q_CM(2);
     double &qz = I_q_CM(3);
 
+    double mx;
+    double my;
+    double yaw;
+
+    bool is_init_pos;
+
+    double init_yaw;
+
     Vector3d CM_p_CM_T;
     Vector3d CM_u_CM_T;
     Vector2d eq_rp;
@@ -82,8 +95,6 @@ class CoaxCTRL{
     Vector3d I_a_des;
     Vector4d I_q_des;
     Vector3d roll_pitch_yaw;
-
-
 
     Vector3d u_pos;
     Vector3d u_att;
@@ -112,7 +123,6 @@ class CoaxCTRL{
     double &qx_des = I_q_des(1);
     double &qy_des = I_q_des(2);
     double &qz_des = I_q_des(3);
-    
 
     const double throttle_max = 500.0;
     const double throttle_min = 300.0;

@@ -2,6 +2,8 @@
 
 CoaxCTRL::CoaxCTRL()
 {
+    is_init_pos = false;
+    init_yaw = 0;
     // Constructor
     cout<<"*****Mass Parameter Setup*****"<<endl;
     nh.getParam("mass",mass);
@@ -62,11 +64,12 @@ CoaxCTRL::CoaxCTRL()
     traj_subscriber = nh.subscribe("/des_traj",1,&CoaxCTRL::CallbackDesTraj,this);
 
     cout<<"Estimated Pose Subscriber Setup"<<endl;
+    mag_subscriber = nh.subscribe("/mavros/global_position/compass_hdg",1,&CoaxCTRL::CallbackHdg,this);
     pose_subscriber = nh.subscribe("/mavros/local_position/odom",1,&CoaxCTRL::CallbackPose,this);
 
     cout<<"*****Publisher Setup*****"<<endl;
     cout<<"Actuator Publisher Setup"<<endl;
-    actuator_publisher = nh.advertise<actuator>("/des_roll_pitch",1);
+    actuator_publisher = nh.advertise<actuator>("/actuation",1);
 
 
     I_p_CM.setZero();
@@ -112,6 +115,21 @@ void CoaxCTRL::CallbackDesTraj(const traj & des_traj)
 
 
 }
+void CoaxCTRL::CallbackHdg(const Float64 & cmps_hdg_data)
+{
+    //yaw = cmps_hdg_data.data*M_PI/180.0;
+/**
+    if(is_init_pos == false)
+    {
+        init_yaw = yaw;
+        is_init_pos = true;
+    }
+
+    yaw = yaw - init_yaw;
+    yaw = atan2(sin(yaw),cos(yaw));
+**/
+}
+
 
 void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
 {
@@ -133,9 +151,34 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
             pose_msg.twist.twist.angular.y,
             pose_msg.twist.twist.angular.z;
 
+    roll_pitch_yaw(0) = asin(2*(qy*qz + qw*qx));
+    
+    roll_pitch_yaw(1) = -atan2(2*(qx*qz - qw*qy)/cos(roll_pitch_yaw(0)),
+    (1-2*(pow(qx,2)+pow(qy,2)))/cos(roll_pitch_yaw(0)));
 
-    //PosControl();
-    OriControl();
+    roll_pitch_yaw(2) = atan2(2*(qx*qy - qw*qz)/cos(roll_pitch_yaw(0)),
+    (1-2*(pow(qx,2)+pow(qz,2)))/cos(roll_pitch_yaw(0)))
+     - init_yaw;
+    
+    if(is_init_pos == false)
+    {
+
+        init_yaw = roll_pitch_yaw(2);
+        is_init_pos = true;
+    }
+
+    yaw = roll_pitch_yaw(2);
+    roll_pitch_yaw(2) = atan2(sin(yaw),cos(yaw));
+
+    cout<<roll_pitch_yaw*180.0/M_PI<<endl;
+
+
+    if(is_init_pos = true)
+    {
+        //PosControl();
+        OriControl();
+    }
+
 
 }
 
@@ -147,20 +190,11 @@ void CoaxCTRL::PosControl()
     
     thrust = sqrt(u_pos.transpose()*u_pos);
     throttle = thrust;
-    cout<<"Throttle : "<<u_pos<<endl;
-    cout<<"\n";
     //throttle = sqrt(thrust / gear_ratio / C_lift);
 
     throttle_clamping(throttle);
 
     des_yaw = -2*atan2(qz_des,qw_des);
-
-    roll_pitch_yaw(0) = atan2(2*(qw*qx + qy*qz),1-2*(pow(qx,2)+pow(qy,2)));
-    
-    roll_pitch_yaw(1) = asin(2*(qw*qy-qz*qx));
-    
-    roll_pitch_yaw(2) = atan2(2*(qx*qy - qw*qz)/cos(roll_pitch_yaw(0)),
-    (1-2*(pow(qx,2)+pow(qz,2)))/cos(roll_pitch_yaw(0)));
 
     if(thrust > 0){
         des_roll_pitch_yaw(0) = asin((u_pos(0)*sin(des_yaw)+u_pos(1)*cos(des_yaw))/thrust) + hovering_rp(0);
@@ -181,33 +215,24 @@ void CoaxCTRL::OriControl()
 
     yaw_clamping();
 
-    //roll_pitch_yaw(0) = atan2(2*(qw*qx + qy*qz),1-2*(qx*qx+qy*qy));
-  
-    //roll_pitch_yaw(1) = asin(2*(qw*qy-qz*qx));
-
-    roll_pitch_yaw(0) = asin(2*(qy*qz + qw*qx));
-    
-    roll_pitch_yaw(1) = -atan2(2*(qx*qz - qw*qy)/cos(roll_pitch_yaw(0)),
-    (1-2*(pow(qx,2)+pow(qy,2)))/cos(roll_pitch_yaw(0)));
-
-    roll_pitch_yaw(2) = atan2(2*(qx*qy - qw*qz)/cos(roll_pitch_yaw(0)),
-    (1-2*(pow(qx,2)+pow(qz,2)))/cos(roll_pitch_yaw(0)));
-
-
     u_att = Kp_ori * (des_roll_pitch_yaw - roll_pitch_yaw) - Kd_ori*I_w;
     u_att(0) += eq_rp(0);
     u_att(1) += eq_rp(1);
 
-    cout<<roll_pitch_yaw*180.0/M_PI<<endl;
-    cout<<endl;
+    //cout<<roll_pitch_yaw*180.0/M_PI<<endl;
+    //cout<<endl;
 
     actuator_data.main_rotor_pwm = throttle;
     actuator_data.phi_u = - u_att(0);
     actuator_data.theta_u = - u_att(1);
-    actuator_data.right_servo = u_att(2)/2.0;
-    actuator_data.left_servo = u_att(2)/2.0;
+    actuator_data.left_servo = int32_t (-u_att(2)*1000.0);
+    actuator_data.right_servo = int32_t (-u_att(2)*1000.0);
+
+    cout<<"Yaw input: "<<actuator_data.left_servo<<endl;
 
     actuator_publisher.publish(actuator_data);
+
+
 }
 
 void CoaxCTRL::throttle_clamping(uint16_t &throttle_ptr)
