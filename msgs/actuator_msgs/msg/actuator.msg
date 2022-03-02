@@ -1,5 +1,5 @@
-uint16 main_rotor_pwm
-int32 phi_u
-int32 theta_u
-uint16 left_servo
-uint16 right_servo
+float32 main_rotor_pwm
+float32 phi_u
+float32 theta_u
+int32 left_servo
+int32 right_servo
