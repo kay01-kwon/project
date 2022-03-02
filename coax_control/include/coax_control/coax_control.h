@@ -36,8 +36,6 @@ class CoaxCTRL{
     // Callback trajectory
     void CallbackDesTraj(const traj & des_traj_data);
 
-    // Callback Heading
-    void CallbackHdg(const Float64 & cmps_hdg_data);
     // Callback Estimated Pose
     void CallbackPose(const Odometry & pose_msg);
 
@@ -61,7 +59,6 @@ class CoaxCTRL{
     private:
     ros::NodeHandle nh;
     ros::Subscriber traj_subscriber;
-    ros::Subscriber mag_subscriber;
     ros::Subscriber pose_subscriber;
     ros::Publisher actuator_publisher;
 

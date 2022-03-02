@@ -64,7 +64,6 @@ CoaxCTRL::CoaxCTRL()
     traj_subscriber = nh.subscribe("/des_traj",1,&CoaxCTRL::CallbackDesTraj,this);
 
     cout<<"Estimated Pose Subscriber Setup"<<endl;
-    mag_subscriber = nh.subscribe("/mavros/global_position/compass_hdg",1,&CoaxCTRL::CallbackHdg,this);
     pose_subscriber = nh.subscribe("/mavros/local_position/odom",1,&CoaxCTRL::CallbackPose,this);
 
     cout<<"*****Publisher Setup*****"<<endl;
@@ -115,21 +114,6 @@ void CoaxCTRL::CallbackDesTraj(const traj & des_traj)
 
 
 }
-void CoaxCTRL::CallbackHdg(const Float64 & cmps_hdg_data)
-{
-    //yaw = cmps_hdg_data.data*M_PI/180.0;
-/**
-    if(is_init_pos == false)
-    {
-        init_yaw = yaw;
-        is_init_pos = true;
-    }
-
-    yaw = yaw - init_yaw;
-    yaw = atan2(sin(yaw),cos(yaw));
-**/
-}
-
 
 void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
 {
