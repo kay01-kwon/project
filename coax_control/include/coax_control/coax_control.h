@@ -61,13 +61,17 @@ class CoaxCTRL{
     ros::Subscriber traj_subscriber;
     ros::Subscriber pose_subscriber;
     ros::Publisher actuator_publisher;
+    ros::Publisher odom_publisher;
 
     Vector3d I_p_CM;
+    Vector3d I_p_CM_init;
     Vector3d I_v_CM;
     Vector3d I_w;
     Vector3d I_a_CM;
     Vector3d I_W_CM;
     Vector4d I_q_CM;    //qw, qx, qy, qz
+
+    Matrix3d R;
 
     double &qw = I_q_CM(0);
     double &qx = I_q_CM(1);
@@ -128,6 +132,7 @@ class CoaxCTRL{
     const double des_pitch_max = 8 * M_PI/180.0;
 
     actuator actuator_data;
+    Odometry odom_data;
 
 };
 

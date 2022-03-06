@@ -69,7 +69,7 @@ CoaxCTRL::CoaxCTRL()
     cout<<"*****Publisher Setup*****"<<endl;
     cout<<"Actuator Publisher Setup"<<endl;
     actuator_publisher = nh.advertise<actuator>("/actuation",1);
-
+    odom_publisher = nh.advertise<Odometry>("/Test",1);
 
     I_p_CM.setZero();
     I_v_CM.setZero();
@@ -135,7 +135,7 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
             pose_msg.twist.twist.angular.y,
             pose_msg.twist.twist.angular.z;
 
-    roll_pitch_yaw(0) = asin(2*(qy*qz + qw*qx));
+    roll_pitch_yaw(0) = asin(2*(qy*qz + qw*qx)) + 0.04712;
     
     roll_pitch_yaw(1) = -atan2(2*(qx*qz - qw*qy)/cos(roll_pitch_yaw(0)),
     (1-2*(pow(qx,2)+pow(qy,2)))/cos(roll_pitch_yaw(0)));
@@ -146,10 +146,15 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
     
     if(is_init_pos == false)
     {
-
+        I_p_CM_init = I_p_CM;
         init_yaw = roll_pitch_yaw(2);
+        R <<cos(init_yaw), -sin(init_yaw), 0,
+            sin(init_yaw), cos(init_yaw), 0,
+            0, 0, 1;
         is_init_pos = true;
     }
+
+    I_p_CM = R*(I_p_CM - I_p_CM_init);
 
     yaw = roll_pitch_yaw(2);
     roll_pitch_yaw(2) = atan2(sin(yaw),cos(yaw));
@@ -159,8 +164,13 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
 
     if(is_init_pos = true)
     {
-        //PosControl();
+        PosControl();
         OriControl();
+        odom_data.pose.pose.position.x = I_p_CM(0);
+        odom_data.pose.pose.position.y = I_p_CM(1);
+        odom_data.pose.pose.position.z = I_p_CM(2);
+        
+        odom_publisher.publish(odom_data);
     }
 
 
@@ -172,13 +182,16 @@ void CoaxCTRL::PosControl()
             + Kp_pos*(I_p_des - I_p_CM) 
             + Kd_pos*(I_v_des - I_v_CM)) + I_W_CM;
     
-    thrust = sqrt(u_pos.transpose()*u_pos);
-    throttle = thrust;
+    //thrust = sqrt(u_pos.transpose()*u_pos);
+    //throttle = thrust;
+    
     //throttle = sqrt(thrust / gear_ratio / C_lift);
 
     throttle_clamping(throttle);
 
     des_yaw = -2*atan2(qz_des,qw_des);
+    des_yaw = 0;
+    thrust = 647.46;
 
     if(thrust > 0){
         des_roll_pitch_yaw(0) = asin((u_pos(0)*sin(des_yaw)+u_pos(1)*cos(des_yaw))/thrust) + hovering_rp(0);
@@ -200,6 +213,8 @@ void CoaxCTRL::OriControl()
     yaw_clamping();
 
     u_att = Kp_ori * (des_roll_pitch_yaw - roll_pitch_yaw) - Kd_ori*I_w;
+    u_att(0) = 1.2*(des_roll_pitch_yaw(0) - roll_pitch_yaw(0)) - 0.5*I_w(0);
+    u_att(2) = 0.5 * (des_roll_pitch_yaw(2) - roll_pitch_yaw(2)) + 0.1*I_w(2);
     u_att(0) += eq_rp(0);
     u_att(1) += eq_rp(1);
 
@@ -207,15 +222,21 @@ void CoaxCTRL::OriControl()
     //cout<<endl;
 
     actuator_data.main_rotor_pwm = throttle;
-    actuator_data.phi_u = - u_att(0);
+    actuator_data.phi_u =  -u_att(0);
     actuator_data.theta_u = - u_att(1);
-    actuator_data.left_servo = int32_t (-u_att(2)*1000.0);
-    actuator_data.right_servo = int32_t (-u_att(2)*1000.0);
+
+    u_att(2) = u_att(2) * 1000.0;
+    if( u_att(2) > 90)
+	    u_att(2) =90;
+    else if(u_att(2) < -90)
+	    u_att(2) = -90;
+
+    actuator_data.left_servo = u_att(2);
+    actuator_data.right_servo = u_att(2);
 
     cout<<"Yaw input: "<<actuator_data.left_servo<<endl;
 
     actuator_publisher.publish(actuator_data);
-
 
 }
 
