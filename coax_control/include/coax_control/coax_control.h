@@ -14,6 +14,9 @@
 #include <eigen3/Eigen/Dense>
 #include <cmath>
 
+#include <vector>
+#include <numeric>
+
 using tip_generation::traj;
 using std_msgs::Float64;
 using nav_msgs::Odometry;
@@ -66,7 +69,13 @@ class CoaxCTRL{
     Vector3d I_p_CM;
     Vector3d I_p_CM_init;
     Vector3d I_v_CM;
+
+    std::vector<double> wx;
+    std::vector<double> wy;
+    std::vector<double> wz;
+
     Vector3d I_w;
+
     Vector3d I_a_CM;
     Vector3d I_W_CM;
     Vector4d I_q_CM;    //qw, qx, qy, qz
@@ -78,8 +87,6 @@ class CoaxCTRL{
     double &qy = I_q_CM(2);
     double &qz = I_q_CM(3);
 
-    double mx;
-    double my;
     double yaw;
 
     bool is_init_pos;
@@ -109,9 +116,15 @@ class CoaxCTRL{
     double Kp_pos;
     double Kd_pos;
 
-    double Kp_ori;
-    double Kd_ori;
+    double Kp_ori_phi;
+    double Kp_ori_theta;
+    double Kp_ori_yaw;
 
+    double Kd_ori_phi;
+    double Kd_ori_theta;
+    double Kd_ori_yaw;
+
+	
     double C_lift;
 
     double thrust;
@@ -130,6 +143,9 @@ class CoaxCTRL{
     const double gear_ratio = 4.5;
     const double des_roll_max = 8 * M_PI/180.0;
     const double des_pitch_max = 8 * M_PI/180.0;
+
+    int idx;
+    int size_of_mv_avg;
 
     actuator actuator_data;
     Odometry odom_data;

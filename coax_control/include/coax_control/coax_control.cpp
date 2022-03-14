@@ -25,7 +25,7 @@ CoaxCTRL::CoaxCTRL()
     phi = -asin(CM_u_CM_T(1));
     theta = atan2(CM_u_CM_T(0)/cos(phi),CM_u_CM_T(2)/cos(phi));
 
-    eq_rp << phi, theta; // Roll, pitch (y-x convention)
+    eq_rp << phi/2, theta; // Roll, pitch (y-x convention)
     hovering_rp = -eq_rp;
     cout<<"*****Equlibrium TVC Info (deg)*****"<<endl;
     cout<<"Roll : ";
@@ -47,11 +47,20 @@ CoaxCTRL::CoaxCTRL()
     cout<<"Kp_pos Gain: "<<Kp_pos<<endl;
     cout<<"Kd_pos Gain: "<<Kd_pos<<endl;
 
-    nh.getParam("Kp_ori",Kp_ori);
-    nh.getParam("Kd_ori",Kd_ori);
+    nh.getParam("Kp_ori_phi",Kp_ori_phi);
+    nh.getParam("Kp_ori_theta",Kp_ori_theta);
+    nh.getParam("Kp_ori_yaw",Kp_ori_yaw);
+    
+    nh.getParam("Kd_ori_phi",Kd_ori_phi);
+    nh.getParam("Kd_ori_theta",Kd_ori_theta);
+    nh.getParam("Kd_ori_yaw",Kd_ori_yaw);
 
-    cout<<"Kp_ori Gain: "<<Kp_ori<<endl;
-    cout<<"Kd_ori Gain: "<<Kd_ori<<endl;
+
+    cout<<"Kp_ori phi Gain: "<<Kp_ori_phi<<endl;
+    cout<<"Kp_ori theta Gain: "<<Kp_ori_theta<<endl;
+    cout<<"Kp_ori yaw Gain: "<<Kp_ori_yaw<<endl;
+
+    //cout<<"Kd_ori Gain: "<<Kd_ori_phi<<endl;
 
     cout<<"*****Get Lift Parameter*****"<<endl;
     nh.getParam("C_lift",C_lift);
@@ -64,7 +73,7 @@ CoaxCTRL::CoaxCTRL()
     traj_subscriber = nh.subscribe("/des_traj",1,&CoaxCTRL::CallbackDesTraj,this);
 
     cout<<"Estimated Pose Subscriber Setup"<<endl;
-    pose_subscriber = nh.subscribe("/mavros/local_position/odom",1,&CoaxCTRL::CallbackPose,this);
+    pose_subscriber = nh.subscribe("/mavros/odometry/in",1,&CoaxCTRL::CallbackPose,this);
 
     cout<<"*****Publisher Setup*****"<<endl;
     cout<<"Actuator Publisher Setup"<<endl;
@@ -89,6 +98,9 @@ CoaxCTRL::CoaxCTRL()
     rpy_error.setZero();
     
     des_roll_pitch_yaw.setZero();
+
+    idx = 1;
+    size_of_mv_avg = 20;
 
 }
 
@@ -130,12 +142,27 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
     I_v_CM << pose_msg.twist.twist.linear.x,
             pose_msg.twist.twist.linear.y,
             pose_msg.twist.twist.linear.z;
+    
+    if (idx < size_of_mv_avg ){
+	wx.push_back(pose_msg.twist.twist.angular.x);
+	wy.push_back(pose_msg.twist.twist.angular.y);
+	wz.push_back(pose_msg.twist.twist.angular.z);
+	idx++;
+    }
+    else{
+	idx = 10;
+	wx.erase(wx.begin(),wx.begin()+10);
+	wy.erase(wy.begin(),wy.begin()+10);
+	wz.erase(wz.begin(),wz.begin()+10);
+    }
 
-    I_w << pose_msg.twist.twist.angular.x,
-            pose_msg.twist.twist.angular.y,
-            pose_msg.twist.twist.angular.z;
 
-    roll_pitch_yaw(0) = asin(2*(qy*qz + qw*qx)) + 0.04712;
+
+    I_w << std::accumulate(wx.begin(),wx.end(),0.0)/(double)size_of_mv_avg,
+    	std::accumulate(wy.begin(),wy.end(),0.0)/(double)size_of_mv_avg,
+        std::accumulate(wz.begin(),wz.end(),0.0)/(double)size_of_mv_avg;
+
+    roll_pitch_yaw(0) = asin(2*(qy*qz + qw*qx));
     
     roll_pitch_yaw(1) = -atan2(2*(qx*qz - qw*qy)/cos(roll_pitch_yaw(0)),
     (1-2*(pow(qx,2)+pow(qy,2)))/cos(roll_pitch_yaw(0)));
@@ -164,12 +191,17 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
 
     if(is_init_pos = true)
     {
-        PosControl();
+        //PosControl();
         OriControl();
+	odom_data.header.stamp = ros::Time::now();
         odom_data.pose.pose.position.x = I_p_CM(0);
         odom_data.pose.pose.position.y = I_p_CM(1);
         odom_data.pose.pose.position.z = I_p_CM(2);
-        
+	odom_data.twist.twist.angular.x = I_w(0);
+ 	odom_data.twist.twist.angular.y = I_w(1);
+	odom_data.twist.twist.angular.z = I_w(2);	
+
+
         odom_publisher.publish(odom_data);
     }
 
@@ -186,12 +218,22 @@ void CoaxCTRL::PosControl()
     //throttle = thrust;
     
     //throttle = sqrt(thrust / gear_ratio / C_lift);
+    //
+    if (u_pos(0) > 10)
+	u_pos(0) = 10;
+    else if (u_pos(0) < -10)
+	u_pos(0) = -10;
+
+    if (u_pos(1) > 10)
+        u_pos(1) = 10;
+    else if (u_pos(1) < -10)
+        u_pos(1) = -10;
 
     throttle_clamping(throttle);
 
     des_yaw = -2*atan2(qz_des,qw_des);
     des_yaw = 0;
-    thrust = 647.46;
+    thrust = 588.6;
 
     if(thrust > 0){
         des_roll_pitch_yaw(0) = asin((u_pos(0)*sin(des_yaw)+u_pos(1)*cos(des_yaw))/thrust) + hovering_rp(0);
@@ -212,11 +254,12 @@ void CoaxCTRL::OriControl()
 
     yaw_clamping();
 
-    u_att = Kp_ori * (des_roll_pitch_yaw - roll_pitch_yaw) - Kd_ori*I_w;
-    u_att(0) = 1.2*(des_roll_pitch_yaw(0) - roll_pitch_yaw(0)) - 0.5*I_w(0);
-    u_att(2) = 0.5 * (des_roll_pitch_yaw(2) - roll_pitch_yaw(2)) + 0.1*I_w(2);
-    u_att(0) += eq_rp(0);
-    u_att(1) += eq_rp(1);
+    //u_att = Kp_ori * (des_roll_pitch_yaw - roll_pitch_yaw) - Kd_ori*I_w;
+    u_att(0) = Kp_ori_phi*(des_roll_pitch_yaw(0) - roll_pitch_yaw(0)) - Kd_ori_phi*I_w(0);
+    u_att(1) = Kp_ori_theta*(des_roll_pitch_yaw(1) - roll_pitch_yaw(1)) - Kd_ori_theta*I_w(1);
+    u_att(2) = Kp_ori_yaw * (des_roll_pitch_yaw(2) - roll_pitch_yaw(2)) + Kd_ori_yaw*I_w(2);
+    u_att(0) -= eq_rp(0);
+    u_att(1) -= eq_rp(1);
 
     //cout<<roll_pitch_yaw*180.0/M_PI<<endl;
     //cout<<endl;
@@ -225,11 +268,11 @@ void CoaxCTRL::OriControl()
     actuator_data.phi_u =  -u_att(0);
     actuator_data.theta_u = - u_att(1);
 
-    u_att(2) = u_att(2) * 1000.0;
-    if( u_att(2) > 90)
-	    u_att(2) =90;
-    else if(u_att(2) < -90)
-	    u_att(2) = -90;
+    u_att(2) = u_att(2) * 100.0;
+    if( u_att(2) > 80.0 )
+	    u_att(2) = 80.0;
+    else if(u_att(2) < -80.0)
+	    u_att(2) = -80.0;
 
     actuator_data.left_servo = u_att(2);
     actuator_data.right_servo = u_att(2);
