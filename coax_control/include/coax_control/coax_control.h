@@ -55,7 +55,9 @@ class CoaxCTRL{
     double signum(double &sign_ptr);
 
     void yaw_clamping();
-    
+
+    Matrix3d RotM(double & yaw);
+
     // Destructor
     ~CoaxCTRL();
 

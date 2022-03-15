@@ -144,18 +144,17 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
             pose_msg.twist.twist.linear.z;
     
     if (idx < size_of_mv_avg ){
-	wx.push_back(pose_msg.twist.twist.angular.x);
-	wy.push_back(pose_msg.twist.twist.angular.y);
-	wz.push_back(pose_msg.twist.twist.angular.z);
-	idx++;
+        wx.push_back(pose_msg.twist.twist.angular.x);
+        wy.push_back(pose_msg.twist.twist.angular.y);
+        wz.push_back(pose_msg.twist.twist.angular.z);
+        idx++;
     }
     else{
-	idx = 10;
-	wx.erase(wx.begin(),wx.begin()+10);
-	wy.erase(wy.begin(),wy.begin()+10);
-	wz.erase(wz.begin(),wz.begin()+10);
+        idx = 10;
+        wx.erase(wx.begin(),wx.begin()+10);
+        wy.erase(wy.begin(),wy.begin()+10);
+        wz.erase(wz.begin(),wz.begin()+10);
     }
-
 
 
     I_w << std::accumulate(wx.begin(),wx.end(),0.0)/(double)size_of_mv_avg,
@@ -182,10 +181,9 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
     }
 
     I_p_CM = R*(I_p_CM - I_p_CM_init);
-
     yaw = roll_pitch_yaw(2);
     roll_pitch_yaw(2) = atan2(sin(yaw),cos(yaw));
-
+    I_v_CM = RotM(roll_pitch_yaw(2))*I_v_CM;
     cout<<roll_pitch_yaw*180.0/M_PI<<endl;
 
 
@@ -193,14 +191,18 @@ void CoaxCTRL::CallbackPose(const Odometry & pose_msg)
     {
         //PosControl();
         OriControl();
-	odom_data.header.stamp = ros::Time::now();
+        odom_data.header.stamp = ros::Time::now();
         odom_data.pose.pose.position.x = I_p_CM(0);
         odom_data.pose.pose.position.y = I_p_CM(1);
         odom_data.pose.pose.position.z = I_p_CM(2);
-	odom_data.twist.twist.angular.x = I_w(0);
- 	odom_data.twist.twist.angular.y = I_w(1);
-	odom_data.twist.twist.angular.z = I_w(2);	
 
+        odom_data.twist.twist.linear.x = I_v_CM(0);
+        odom_data.twist.twist.linear.y = I_v_CM(1);
+        odom_data.twist.twist.linear.z = I_v_CM(2);
+        
+        odom_data.twist.twist.angular.x = I_w(0);
+        odom_data.twist.twist.angular.y = I_w(1);
+        odom_data.twist.twist.angular.z = I_w(2);	
 
         odom_publisher.publish(odom_data);
     }
@@ -220,9 +222,9 @@ void CoaxCTRL::PosControl()
     //throttle = sqrt(thrust / gear_ratio / C_lift);
     //
     if (u_pos(0) > 10)
-	u_pos(0) = 10;
+        u_pos(0) = 10;
     else if (u_pos(0) < -10)
-	u_pos(0) = -10;
+        u_pos(0) = -10;
 
     if (u_pos(1) > 10)
         u_pos(1) = 10;
@@ -317,6 +319,16 @@ void CoaxCTRL::yaw_clamping()
         rpy_error(2) = rpy_error(2) - 2*M_PI;
     else if (des_roll_pitch_yaw(2) < -M_PI_2 && roll_pitch_yaw(2) > M_PI_2)
         rpy_error(2) = rpy_error(2) + 2*M_PI;
+}
+
+Matrix3d CoaxCTRL::RotM(double &yaw)
+{
+    Matrix3d R;
+    R << cos(yaw), sin(yaw), 0,
+        -sin(yaw), cos(yaw), 0,
+        0, 0, 1;
+
+    return R;
 }
 
 
