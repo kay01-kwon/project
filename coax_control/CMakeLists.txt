@@ -23,3 +23,6 @@ include_directories(
 
 add_executable(coax_control src/main.cpp include/coax_control/coax_control.cpp)
 target_link_libraries(coax_control ${catkin_LIBRARIES})
+
+add_executable(coax_taxing src/Taxing_main.cpp include/coax_control/coax_taxing.cpp)
+target_link_libraries(coax_taxing ${catkin_LIBRARIES})
